@@ -1,0 +1,6 @@
+## Interface: 20501
+## Title: Grid2 |cd1ff7d0aGrid2StatusSpellCast|r
+## Notes: Adds incoming spell cast/channel indicators to Grid2
+## Dependencies: Grid2
+
+Grid2StatusSpellCast.lua
