@@ -1,7 +1,7 @@
 local CastTypeSpell = 'spell'
 local CastTypeChannel = 'channel'
 
-local StatusSpellCast = Grid2.statusPrototype:new("incoming-spell-damage", false) 
+local StatusSpellCast = Grid2.statusPrototype:new("spell-cast", false) 
 StatusSpellCast._eventFrame = CreateFrame("frame")
 StatusSpellCast._isEnabled = false
 StatusSpellCast._defaultDB = {
@@ -9,15 +9,19 @@ StatusSpellCast._defaultDB = {
     special_spells = {
         [30128] = { extra_duration = 2 },
         [32938] = { extra_duration = 2 }
-    }
+    },
+    mode = "all",
+    ignoredSpellList = {},
+    selectedSpellList = {}
 }
 
 StatusSpellCast._active_indicators = {}
 StatusSpellCast._player_guids_incoming_spells = {}
 StatusSpellCast._npc_guids_outgoing_spells = {}
 
-StatusSpellCast.db = {}
-StatusSpellCast.db.profile = StatusSpellCast._defaultDB
+if (not StatusSpellCastDB) then
+    StatusSpellCastDB = StatusSpellCast._defaultDB
+end
 
 StatusSpellCast.unit_ids = {
     "target", 
@@ -26,16 +30,157 @@ StatusSpellCast.unit_ids = {
     "arena1", "arena2","arena3", "arena4","arena5", "arena6","arena7", "arena8","arena9", "arena10",
 }
 
-Grid2.setupFunc["incoming-spell-damage"] = function(baseKey, dbx)
+Grid2.setupFunc["spell-cast"] = function(baseKey, dbx)
 	Grid2:RegisterStatus(StatusSpellCast, {"icon", "text"}, baseKey, dbx)
-	return StatusSpellCast
+	return status
 end
-Grid2:DbSetStatusDefaultValue("incoming-spell-damage", {type = "incoming-spell-damage", color1 = {r=0,g=.6,b=1,a=.6}})
+Grid2:DbSetStatusDefaultValue("spell-cast", {type = "spell-cast", color1 = {r=0,g=.6,b=1,a=.6}})
+
+local prev_LoadOptions = Grid2.LoadOptions
+function Grid2:LoadOptions()
+    Grid2Options:RegisterStatusOptions("spell-cast", "combat", function(self, status, options)
+        -- self.RDO:Init()
+        -- local empty = not (next(GSRD.db.profile.enabledModules) or next(GSRD.db.profile.debuffs))
+        -- local function GetSpellID(name, defaultSpells) --Taken from StatusHealsAoe
+        --     if tonumber(name) then
+        --         return tonumber(name)
+        --     end
+        --     for _,spells in next, defaultSpells do
+        --         for _,spell in next, spells do
+        --             local spellName = GetSpellInfo(spell)
+        --             if spellName == name then
+        --                 return spell
+        --             end
+        --         end
+        --     end
+        --     local id = 0
+        --     local texture = select(3, GetSpellInfo(name))
+        --     for i=300000, 1, -1  do
+        --         if GetSpellInfo(i) == name then
+        --             id = i
+        --             local _,_,tex = GetSpellInfo(i)
+        --             if tex == texture then
+        --                 return i
+        --             end
+        --         end
+        --     end
+        --     return id
+        -- end
+
+        options.general = {
+                type = "group",
+                name = "General Settings",
+                order = 1,
+                args = {
+                    {
+                        type = "select",
+                        name = "Mode",
+                        order = 1,
+                        values = {
+                            ["all"] = "All spells",
+                            ["all-but"] = "All spells but ignored",
+                            ["none-but"] = "Only selected spells",
+                        },
+                        set = function(info, value)
+                            StatusSpellCastDB["mode"] = value
+                        end,
+                        get = function()
+                            return StatusSpellCastDB["mode"]
+                        end,
+
+                    },
+                }
+            }
+
+        options.ignoredSpells = {
+            type = "group",
+            name = "Ignored spells",
+            order = 2,
+            args = {
+                {
+                    type = "input",
+                    order = 50,
+                    width = "full",
+                    name = "Spells",
+                    desc = "Spell names",
+                    multiline= 20,
+                    get = function()
+                            local spells = {}
+                            for _,spell in pairs(StatusSpellCastDB.ignoredSpellList) do
+                                if spell then
+                                    spells[#spells+1] = spell
+                                end
+                            end
+                            return table.concat( spells, "\n" )
+                    end,
+                    set = function(_, v)
+                        wipe(StatusSpellCastDB.ignoredSpellList)
+                        local spells = { strsplit("\n,", v) }
+                        for i,v in pairs(spells) do
+                            local spell = strtrim(v)
+                            if #spell>0 then
+                                if spell then
+                                    table.insert(StatusSpellCastDB.ignoredSpellList, spell)
+                                end
+                            end
+                        end
+                    end,
+                }
+            }
+        }
+
+        options.selectedSpells = {
+            type = "group",
+            name = "Selected spells",
+            order = 3,
+            args = {
+                {
+                    type = "input",
+                    order = 50,
+                    width = "full",
+                    name = "Spells",
+                    desc = "Spell names",
+                    multiline= 20,
+                    get = function()
+                            local spells = {}
+                            for _,spell in pairs(StatusSpellCastDB.selectedSpellList) do
+                                if spell then
+                                    spells[#spells+1] = spell
+                                end
+                            end
+                            return table.concat( spells, "\n" )
+                    end,
+                    set = function(_, v)
+                        wipe(StatusSpellCastDB.selectedSpellList)
+                        local spells = { strsplit("\n,", v) }
+                        for i,v in pairs(spells) do
+                            local spell = strtrim(v)
+                            if #spell>0 then
+                                if spell then
+                                    table.insert(StatusSpellCastDB.selectedSpellList, spell)
+                                end
+                            end
+                        end
+                    end,
+                }
+            }
+        }
+    end, 
+    {
+        hideTitle    = false,
+        childGroups  = "tab",
+        groupOrder   = 1,
+        -- titleIcon    = Grid2.isClassic and "Interface\\Icons\\Ability_Creature_Cursed_05" or "Interface\\Icons\\Spell_Shadow_Skull",
+    })
+
+
+    prev_LoadOptions(self)
+end
 
 
 function StatusSpellCast:OnEnable()
 	if not self._timer then
-		self._timer = Grid2:CreateTimer(self.OnUpdate, self.db.profile.interval)
+		self._timer = Grid2:CreateTimer(self.OnUpdate, StatusSpellCastDB.interval)
 	end
 
     -- self._eventFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
@@ -72,27 +217,6 @@ function StatusSpellCast:CombatLogEvent(self, ...)
     -- print(...)
 end
 
--- local function GetCombatUnitInformation(sourceGuid)
---     local sourceUnitId = GetNpcUnitId(sourceGuid)
---     if (not sourceUnitId) then
---         return nil
---     end
-
---     local sourceTargetUnitId = sourceUnitId .. "target"
---     destinationGuid = UnitGUID(sourceTargetUnitId)
---     local destinationUnitId = Grid2:IsGUIDInRaid(destinationGuid)
---     if (not destinationUnitId) then
---         return nil
---     end
-
---     return {
---         sourceGuid = sourceGuid,
---         sourceUnitId = sourceUnitId,
---         destinationUnitId = destinationUnitId,
---         destinationGuid = destinationGuid,
---     }
--- end
-
 function StatusSpellCast:OnUpdate()
     self = StatusSpellCast
 
@@ -103,20 +227,42 @@ function StatusSpellCast:OnUpdate()
     for i=1, 40 do
         nameplate = "nameplate" .. tostring(i)
         if UnitExists(nameplate) then
-            StatusSpellCast:HandleEnemeyUnit(nameplate, UnitCastingInfo)
-            StatusSpellCast:HandleEnemeyUnit(nameplate, UnitChannelInfo)
+            StatusSpellCast:HandleEnemeyUnit(nameplate)
+            --StatusSpellCast:HandleEnemeyUnit(nameplate, UnitChannelInfo)
         end
     end
 
     for i, unitId in pairs(StatusSpellCast.unit_ids) do
         if UnitExists(unitId) then
             StatusSpellCast:HandleEnemeyUnit(nameplate)
-            StatusSpellCast:HandleEnemeyUnit(nameplate)
+            --StatusSpellCast:HandleEnemeyUnit(nameplate)
         end
     end
 end
 
-function StatusSpellCast:HandleEnemeyUnit(unitId, castInfoFunction)
+local function IsSpellRelevant(spellName)
+    if (StatusSpellCastDB.mode == "all-but") then
+        for _, spell in pairs(StatusSpellCastDB.ignoredSpellList) do
+            if (spellName == spell) then
+                return false
+            end
+        end
+
+        return true
+    elseif (StatusSpellCastDB.mode == "none-but") then
+        for _, spell in pairs(StatusSpellCastDB.selectedSpellList) do
+            if (spellName == spell) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    return true
+end
+
+function StatusSpellCast:HandleEnemeyUnit(unitId)
     unitInformation = self:GetSpellEventUnitInformation(unitId)
     if not unitInformation then
         return
@@ -148,21 +294,21 @@ function StatusSpellCast:HandleEnemeyUnit(unitId, castInfoFunction)
     end
     
     -- spell, text, icon, startTime, endTime, _, spellIdChannel, spellIdCast = castInfoFunction(unitInformation.sourceUnitId)
-    if not spell then
+    if not spell or not IsSpellRelevant(spell) then
         return false
     end
 
-    special_spell = StatusSpellCast.db.profile.special_spells[spellId]
+    special_spell = StatusSpellCastDB.special_spells[spellId]
     extra_duration = special_spell and special_spell.extra_duration or 0
     -- print(spellId, extra_duration, special_spell)
     self._active_indicators[unitInformation.destinationUnitId] = {
         icon = icon,
         start = startTime/1000,
-        duration = (endTime-startTime) / 1000 + (self.db.profile.interval/2) + extra_duration,
+        duration = (endTime-startTime) / 1000 + (StatusSpellCastDB.interval/2) + extra_duration,
         ICON_TEX_COORDS,
         text = text,
         unitInformation = unitInformation,
-        endTime = endTime/1000 + (self.db.profile.interval/2) + extra_duration,
+        endTime = endTime/1000 + (StatusSpellCastDB.interval/2) + extra_duration,
         castType = castType
     }
 
