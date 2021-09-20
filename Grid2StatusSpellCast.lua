@@ -144,7 +144,7 @@ function Grid2:LoadOptions()
         hideTitle    = false,
         childGroups  = "tab",
         groupOrder   = 1,
-        -- titleIcon    = Grid2.isClassic and "Interface\\Icons\\Ability_Creature_Cursed_05" or "Interface\\Icons\\Spell_Shadow_Skull",
+        titleIcon    = "Interface\\Icons\\Spell_nature_starfall",
     })
 
 
